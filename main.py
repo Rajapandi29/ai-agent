@@ -104,7 +104,7 @@ def _ensure_database_indexes():
         for stmt in stmts:
             conn.execute(text(stmt))
 
-app = FastAPI(title="SerpHawk CRM", version="2.0.0")
+app = FastAPI(title="SerpHawk CRM", version="2.0.0", root_path="/api")
 
 @app.on_event("startup")
 def on_startup():
