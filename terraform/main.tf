@@ -1,7 +1,3 @@
-############################################
-# VPC
-############################################
-
 resource "aws_vpc" "main" {
   cidr_block = var.vpc_cidr
 
@@ -14,10 +10,6 @@ resource "aws_vpc" "main" {
   }
 }
 
-############################################
-# INTERNET GATEWAY
-############################################
-
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
@@ -25,10 +17,6 @@ resource "aws_internet_gateway" "main" {
     Name = "${var.app_name}-igw"
   }
 }
-
-############################################
-# PUBLIC SUBNETS
-############################################
 
 resource "aws_subnet" "public" {
   count = length(var.public_subnet_cidrs)
@@ -48,10 +36,6 @@ resource "aws_subnet" "public" {
   }
 }
 
-############################################
-# PRIVATE ECS SUBNETS
-############################################
-
 resource "aws_subnet" "private_ecs" {
   count = length(var.private_ecs_subnet_cidrs)
 
@@ -69,10 +53,6 @@ resource "aws_subnet" "private_ecs" {
     Type        = "private-ecs"
   }
 }
-
-############################################
-# PRIVATE DATABASE SUBNETS
-############################################
 
 resource "aws_subnet" "private_db" {
   count = length(var.private_db_subnet_cidrs)
@@ -92,10 +72,6 @@ resource "aws_subnet" "private_db" {
   }
 }
 
-############################################
-# PUBLIC ROUTE TABLE
-############################################
-
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -110,10 +86,6 @@ resource "aws_route_table" "public" {
   }
 }
 
-############################################
-# PUBLIC ROUTE ASSOCIATION
-############################################
-
 resource "aws_route_table_association" "public" {
   count = length(aws_subnet.public)
 
@@ -121,10 +93,6 @@ resource "aws_route_table_association" "public" {
 
   route_table_id = aws_route_table.public.id
 }
-
-############################################
-# NAT EIP
-############################################
 
 resource "aws_eip" "nat" {
   domain = "vpc"
@@ -137,10 +105,6 @@ resource "aws_eip" "nat" {
     Name = "${var.app_name}-nat-eip"
   }
 }
-
-############################################
-# NAT GATEWAY
-############################################
 
 resource "aws_nat_gateway" "main" {
   allocation_id = aws_eip.nat.id
@@ -156,10 +120,6 @@ resource "aws_nat_gateway" "main" {
   }
 }
 
-############################################
-# PRIVATE ECS ROUTE TABLE
-############################################
-
 resource "aws_route_table" "private_ecs" {
   vpc_id = aws_vpc.main.id
 
@@ -174,10 +134,6 @@ resource "aws_route_table" "private_ecs" {
   }
 }
 
-############################################
-# PRIVATE ECS ROUTE ASSOCIATION
-############################################
-
 resource "aws_route_table_association" "private_ecs" {
   count = length(aws_subnet.private_ecs)
 
@@ -185,10 +141,6 @@ resource "aws_route_table_association" "private_ecs" {
 
   route_table_id = aws_route_table.private_ecs.id
 }
-
-############################################
-# PRIVATE DB ROUTE TABLE
-############################################
 
 resource "aws_route_table" "private_db" {
   vpc_id = aws_vpc.main.id
@@ -198,10 +150,6 @@ resource "aws_route_table" "private_db" {
   }
 }
 
-############################################
-# PRIVATE DB ROUTE ASSOCIATION
-############################################
-
 resource "aws_route_table_association" "private_db" {
   count = length(aws_subnet.private_db)
 
@@ -209,10 +157,6 @@ resource "aws_route_table_association" "private_db" {
 
   route_table_id = aws_route_table.private_db.id
 }
-
-############################################
-# ALB SECURITY GROUP
-############################################
 
 resource "aws_security_group" "alb" {
   name = "${var.app_name}-alb-sg"
@@ -250,10 +194,6 @@ resource "aws_security_group" "alb" {
   }
 }
 
-############################################
-# FRONTEND SECURITY GROUP
-############################################
-
 resource "aws_security_group" "frontend" {
   name = "${var.app_name}-frontend-sg"
 
@@ -290,9 +230,6 @@ resource "aws_security_group" "frontend" {
   }
 }
 
-############################################
-# BACKEND SECURITY GROUP
-############################################
 
 resource "aws_security_group" "backend" {
   name = "${var.app_name}-backend-sg"
@@ -330,10 +267,6 @@ resource "aws_security_group" "backend" {
   }
 }
 
-############################################
-# DATABASE SECURITY GROUP
-############################################
-
 resource "aws_security_group" "database" {
   name = "${var.app_name}-db-sg"
 
@@ -370,10 +303,6 @@ resource "aws_security_group" "database" {
   }
 }
 
-############################################
-# ECR FRONTEND
-############################################
-
 resource "aws_ecr_repository" "frontend" {
   name = "${var.app_name}-frontend"
 
@@ -389,10 +318,6 @@ resource "aws_ecr_repository" "frontend" {
   }
 }
 
-############################################
-# ECR BACKEND
-############################################
-
 resource "aws_ecr_repository" "backend" {
   name = "${var.app_name}-backend"
 
@@ -407,10 +332,6 @@ resource "aws_ecr_repository" "backend" {
     Environment = var.environment
   }
 }
-
-############################################
-# ECR FRONTEND LIFECYCLE
-############################################
 
 resource "aws_ecr_lifecycle_policy" "frontend" {
   repository = aws_ecr_repository.frontend.name
@@ -436,10 +357,6 @@ resource "aws_ecr_lifecycle_policy" "frontend" {
   })
 }
 
-############################################
-# ECR BACKEND LIFECYCLE
-############################################
-
 resource "aws_ecr_lifecycle_policy" "backend" {
   repository = aws_ecr_repository.backend.name
 
@@ -464,19 +381,12 @@ resource "aws_ecr_lifecycle_policy" "backend" {
   })
 }
 
-############################################
-# CLOUDWATCH FRONTEND
-############################################
-
 resource "aws_cloudwatch_log_group" "frontend" {
   name = "/ecs/${var.app_name}/frontend"
 
   retention_in_days = 7
 }
 
-############################################
-# CLOUDWATCH BACKEND
-############################################
 
 resource "aws_cloudwatch_log_group" "backend" {
   name = "/ecs/${var.app_name}/backend"
@@ -484,9 +394,6 @@ resource "aws_cloudwatch_log_group" "backend" {
   retention_in_days = 7
 }
 
-############################################
-# ECS CLUSTER
-############################################
 
 resource "aws_ecs_cluster" "main" {
   name = "${var.app_name}-cluster"
@@ -502,9 +409,6 @@ resource "aws_ecs_cluster" "main" {
   }
 }
 
-############################################
-# ECS EXECUTION ROLE
-############################################
 
 resource "aws_iam_role" "ecs_execution" {
   name = "${var.app_name}-ecs-execution-role"
@@ -526,19 +430,11 @@ resource "aws_iam_role" "ecs_execution" {
   })
 }
 
-############################################
-# ECS EXECUTION POLICY
-############################################
-
 resource "aws_iam_role_policy_attachment" "ecs_execution" {
   role = aws_iam_role.ecs_execution.name
 
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
-
-############################################
-# ECS TASK ROLE
-############################################
 
 resource "aws_iam_role" "ecs_task" {
   name = "${var.app_name}-ecs-task-role"
@@ -560,9 +456,6 @@ resource "aws_iam_role" "ecs_task" {
   })
 }
 
-############################################
-# RDS SUBNET GROUP
-############################################
 
 resource "aws_db_subnet_group" "postgres" {
   name = "${var.app_name}-db-subnet-group"
@@ -573,10 +466,6 @@ resource "aws_db_subnet_group" "postgres" {
     Name = "${var.app_name}-db-subnet-group"
   }
 }
-
-############################################
-# RDS POSTGRESQL
-############################################
 
 resource "aws_db_instance" "postgres" {
   identifier = "${var.app_name}-postgres"
@@ -617,9 +506,6 @@ resource "aws_db_instance" "postgres" {
   }
 }
 
-############################################
-# APPLICATION LOAD BALANCER
-############################################
 
 resource "aws_lb" "main" {
   name = "${var.app_name}-alb"
@@ -641,10 +527,6 @@ resource "aws_lb" "main" {
     Environment = var.environment
   }
 }
-
-############################################
-# FRONTEND TARGET GROUP
-############################################
 
 resource "aws_lb_target_group" "frontend" {
   name = "${var.app_name}-frontend-tg"
@@ -676,9 +558,6 @@ resource "aws_lb_target_group" "frontend" {
   }
 }
 
-############################################
-# BACKEND TARGET GROUP
-############################################
 
 resource "aws_lb_target_group" "backend" {
   name = "${var.app_name}-backend-tg"
@@ -710,10 +589,6 @@ resource "aws_lb_target_group" "backend" {
   }
 }
 
-############################################
-# ALB LISTENER
-############################################
-
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
 
@@ -727,10 +602,6 @@ resource "aws_lb_listener" "http" {
     target_group_arn = aws_lb_target_group.frontend.arn
   }
 }
-
-############################################
-# BACKEND PATH RULE
-############################################
 
 resource "aws_lb_listener_rule" "backend" {
   listener_arn = aws_lb_listener.http.arn
@@ -753,9 +624,6 @@ resource "aws_lb_listener_rule" "backend" {
   }
 }
 
-############################################
-# FRONTEND ECS TASK DEFINITION
-############################################
 
 resource "aws_ecs_task_definition" "frontend" {
   family = "${var.app_name}-frontend"
@@ -810,9 +678,6 @@ resource "aws_ecs_task_definition" "frontend" {
   ])
 }
 
-############################################
-# BACKEND ECS TASK DEFINITION
-############################################
 
 resource "aws_ecs_task_definition" "backend" {
   family = "${var.app_name}-backend"
@@ -847,10 +712,6 @@ resource "aws_ecs_task_definition" "backend" {
         }
       ]
 
-      ########################################
-      # APPLICATION ENVIRONMENT VARIABLES
-      ########################################
-
       environment = [
         {
           name  = "PORT"
@@ -862,9 +723,6 @@ resource "aws_ecs_task_definition" "backend" {
         }
       ]
 
-      ########################################
-      # CLOUDWATCH LOGGING
-      ########################################
 
       logConfiguration = {
         logDriver = "awslogs"
@@ -883,9 +741,6 @@ resource "aws_ecs_task_definition" "backend" {
   ]
 }
 
-############################################
-# FRONTEND ECS SERVICE
-############################################
 
 resource "aws_ecs_service" "frontend" {
   name = "${var.app_name}-frontend"
@@ -937,10 +792,6 @@ resource "aws_ecs_service" "frontend" {
     aws_nat_gateway.main
   ]
 }
-
-############################################
-# BACKEND ECS SERVICE
-############################################
 
 resource "aws_ecs_service" "backend" {
   name = "${var.app_name}-backend"

@@ -1,7 +1,3 @@
-############################################
-# GENERAL
-############################################
-
 variable "aws_region" {
   type    = string
   default = "us-east-1"
@@ -16,10 +12,6 @@ variable "environment" {
   type    = string
   default = "production"
 }
-
-############################################
-# VPC
-############################################
 
 variable "vpc_cidr" {
   type    = string
@@ -62,9 +54,6 @@ variable "private_db_subnet_cidrs" {
   ]
 }
 
-############################################
-# FRONTEND
-############################################
 
 variable "frontend_port" {
   type    = number
@@ -91,10 +80,6 @@ variable "frontend_desired_count" {
   default = 1
 }
 
-############################################
-# BACKEND
-############################################
-
 variable "backend_port" {
   type    = number
   default = 8000
@@ -120,9 +105,6 @@ variable "backend_desired_count" {
   default = 1
 }
 
-############################################
-# ECR IMAGES
-############################################
 
 variable "frontend_image" {
   type = string
@@ -131,11 +113,6 @@ variable "frontend_image" {
 variable "backend_image" {
   type = string
 }
-
-############################################
-# DATABASE
-############################################
-
 variable "postgres_version" {
   type    = string
   default = "17.6"

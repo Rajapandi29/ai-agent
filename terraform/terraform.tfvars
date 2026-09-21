@@ -1,15 +1,7 @@
-############################################
-# GENERAL
-############################################
-
 aws_region  = "us-east-1"
 app_name    = "ai-agent"
 environment = "production"
 
-
-############################################
-# VPC
-############################################
 
 vpc_cidr = "10.60.0.0/16"
 
@@ -34,10 +26,6 @@ private_db_subnet_cidrs = [
 ]
 
 
-############################################
-# FRONTEND
-############################################
-
 frontend_port = 3000
 
 frontend_health_path = "/"
@@ -48,10 +36,6 @@ frontend_memory = 1024
 
 frontend_desired_count = 1
 
-
-############################################
-# BACKEND
-############################################
 
 backend_port = 8000
 
@@ -64,10 +48,6 @@ backend_memory = 2048
 backend_desired_count = 1
 
 
-############################################
-# DATABASE
-############################################
-
 postgres_version = "17.6"
 
 db_instance_class = "db.t4g.micro"
@@ -78,10 +58,6 @@ db_username = "aiagentadmin"
 
 db_password = "6321613#Rp"
 
-
-############################################
-# INITIAL ECR IMAGES
-############################################
 
 frontend_image = "public.ecr.aws/docker/library/node:20-alpine"
 
