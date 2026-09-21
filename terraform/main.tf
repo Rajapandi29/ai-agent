@@ -575,30 +575,24 @@ resource "aws_db_subnet_group" "postgres" {
 }
 
 ############################################
+############################################
 # RDS POSTGRESQL
 ############################################
 
 resource "aws_db_instance" "postgres" {
   identifier = "${var.app_name}-postgres"
 
-  engine = "postgres"
-
+  engine         = "postgres"
   engine_version = var.postgres_version
-
   instance_class = var.db_instance_class
 
-  allocated_storage = 20
-
+  allocated_storage     = 20
   max_allocated_storage = 20
+  storage_type          = "gp3"
+  storage_encrypted     = true
 
-  storage_type = "gp3"
-
-  storage_encrypted = true
-
-  db_name = var.db_name
-
+  db_name  = var.db_name
   username = var.db_username
-
   password = var.db_password
 
   port = 5432
@@ -610,23 +604,19 @@ resource "aws_db_instance" "postgres" {
   ]
 
   publicly_accessible = false
-
-  multi_az = false
+  multi_az            = false
 
   backup_retention_period = 7
 
   skip_final_snapshot = true
-
   deletion_protection = false
-
-  apply_immediately = true
+  apply_immediately   = true
 
   tags = {
     Name        = "${var.app_name}-postgres"
     Environment = var.environment
   }
 }
-
 ############################################
 # APPLICATION LOAD BALANCER
 ############################################

@@ -74,7 +74,7 @@ db_instance_class = "db.t4g.micro"
 
 db_name = "aiagent"
 
-db_username = "admin!"
+db_username = "aiagentadmin"
 
 db_password = "6321613@Rp"
 
