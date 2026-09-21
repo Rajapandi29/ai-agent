@@ -151,8 +151,8 @@ variable "db_name" {
   default = "aiagent"
 }
 variable "db_username" {
-  type        = string
-  default     = "aiagentadmin"
+  type    = string
+  default = "aiagentadmin"
 }
 
 variable "db_password" {
