@@ -802,7 +802,7 @@ resource "aws_ecs_task_definition" "frontend" {
 
       environment = [
         {
-          name = "NEXT_PUBLIC_API_URL"
+          name  = "NEXT_PUBLIC_API_URL"
           value = "/api"
         }
       ]
