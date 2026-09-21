@@ -7,6 +7,9 @@ on:
     types:
       - completed
 
+permissions:
+  contents: read
+  actions: read
 
 env:
   AWS_REGION: us-east-1
@@ -18,11 +21,17 @@ jobs:
 
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
+    defaults:
+      run:
+        working-directory: terraform
+
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -41,11 +50,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: terraform-plan
-          path: .
+          path: terraform
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Check Terraform Plan
         run: |
+          echo "Terraform plan file:"
           ls -lh tfplan
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+        run: |
+          terraform apply \
+            -auto-approve \
+            tfplan

@@ -17,9 +17,15 @@ jobs:
     name: Terraform Plan
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: terraform
+
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
+
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -44,9 +50,14 @@ jobs:
         run: |
           terraform plan -out=tfplan
 
+      - name: Check Terraform Plan
+        run: |
+          echo "Terraform plan file:"
+          ls -lh tfplan
+
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
-          path: tfplan
-  
+          path: terraform/tfplan
+          
