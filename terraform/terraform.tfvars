@@ -76,7 +76,7 @@ db_name = "aiagent"
 
 db_username = "aiagentadmin"
 
-db_password = "6321613@Rp"
+db_password = "6321613#Rp"
 
 
 ############################################
