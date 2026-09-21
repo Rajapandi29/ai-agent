@@ -575,7 +575,6 @@ resource "aws_db_subnet_group" "postgres" {
 }
 
 ############################################
-############################################
 # RDS POSTGRESQL
 ############################################
 
@@ -617,6 +616,7 @@ resource "aws_db_instance" "postgres" {
     Environment = var.environment
   }
 }
+
 ############################################
 # APPLICATION LOAD BALANCER
 ############################################
@@ -847,32 +847,24 @@ resource "aws_ecs_task_definition" "backend" {
         }
       ]
 
+      ########################################
+      # APPLICATION ENVIRONMENT VARIABLES
+      ########################################
+
       environment = [
         {
           name  = "PORT"
           value = tostring(var.backend_port)
         },
         {
-          name  = "DATABASE_NAME"
-          value = var.db_name
-        },
-        {
-          name  = "DATABASE_HOST"
-          value = aws_db_instance.postgres.address
-        },
-        {
-          name  = "DATABASE_PORT"
-          value = "5432"
-        },
-        {
-          name  = "DATABASE_USER"
-          value = var.db_username
-        },
-        {
-          name  = "DATABASE_PASSWORD"
-          value = var.db_password
+          name  = "DATABASE_URL"
+          value = "postgresql://${var.db_username}:${var.db_password}@${aws_db_instance.postgres.address}:5432/${var.db_name}"
         }
       ]
+
+      ########################################
+      # CLOUDWATCH LOGGING
+      ########################################
 
       logConfiguration = {
         logDriver = "awslogs"
