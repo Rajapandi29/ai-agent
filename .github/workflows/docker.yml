@@ -7,6 +7,9 @@ on:
     types:
       - completed
 
+permissions:
+  contents: read
+
 env:
   AWS_REGION: us-east-1
 
@@ -14,6 +17,7 @@ env:
   BACKEND_ECR_REPOSITORY: ai-agent-backend
 
   ECS_CLUSTER: ai-agent-cluster
+
   FRONTEND_ECS_SERVICE: ai-agent-frontend
   BACKEND_ECS_SERVICE: ai-agent-backend
 
@@ -25,11 +29,34 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
+
+      # -----------------------------------
+      # Checkout
+      # -----------------------------------
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      # -----------------------------------
+      # Check project structure
+      # -----------------------------------
+      - name: Check Project Files
+        run: |
+          echo "Project root:"
+          pwd
+
+          echo ""
+          echo "Root files:"
+          ls -la
+
+          echo ""
+          echo "Frontend:"
+          ls -la frontend
+
+      # -----------------------------------
+      # Configure AWS
+      # -----------------------------------
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -37,42 +64,95 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      # -----------------------------------
+      # Login ECR
+      # -----------------------------------
+      - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build Frontend
+      # -----------------------------------
+      # Build Frontend
+      # -----------------------------------
+      - name: Build Frontend Docker Image
         run: |
           docker build \
             -t ${{ steps.login-ecr.outputs.registry }}/${{ env.FRONTEND_ECR_REPOSITORY }}:latest \
             ./frontend
 
-      - name: Build Backend
+      # -----------------------------------
+      # Build Backend
+      # Backend is in project root
+      # -----------------------------------
+      - name: Build Backend Docker Image
         run: |
           docker build \
             -t ${{ steps.login-ecr.outputs.registry }}/${{ env.BACKEND_ECR_REPOSITORY }}:latest \
-            ./backend
+            .
 
-      - name: Push Frontend
+      # -----------------------------------
+      # Push Frontend
+      # -----------------------------------
+      - name: Push Frontend Image
         run: |
           docker push \
             ${{ steps.login-ecr.outputs.registry }}/${{ env.FRONTEND_ECR_REPOSITORY }}:latest
 
-      - name: Push Backend
+      # -----------------------------------
+      # Push Backend
+      # -----------------------------------
+      - name: Push Backend Image
         run: |
           docker push \
             ${{ steps.login-ecr.outputs.registry }}/${{ env.BACKEND_ECR_REPOSITORY }}:latest
 
+      # -----------------------------------
+      # Update Frontend ECS
+      # -----------------------------------
       - name: Deploy Frontend ECS
         run: |
           aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $FRONTEND_ECS_SERVICE \
+            --cluster "$ECS_CLUSTER" \
+            --service "$FRONTEND_ECS_SERVICE" \
             --force-new-deployment
 
+      # -----------------------------------
+      # Update Backend ECS
+      # -----------------------------------
       - name: Deploy Backend ECS
         run: |
           aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $BACKEND_ECS_SERVICE \
+            --cluster "$ECS_CLUSTER" \
+            --service "$BACKEND_ECS_SERVICE" \
             --force-new-deployment
+
+      # -----------------------------------
+      # Wait Frontend
+      # -----------------------------------
+      - name: Wait for Frontend ECS
+        run: |
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$FRONTEND_ECS_SERVICE"
+
+      # -----------------------------------
+      # Wait Backend
+      # -----------------------------------
+      - name: Wait for Backend ECS
+        run: |
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$BACKEND_ECS_SERVICE"
+
+      # -----------------------------------
+      # Complete
+      # -----------------------------------
+      - name: Deployment Complete
+        run: |
+          echo "======================================"
+          echo "Deployment completed successfully"
+          echo "======================================"
+          echo "Frontend image pushed"
+          echo "Backend image pushed"
+          echo "Frontend ECS updated"
+          echo "Backend ECS updated"
