@@ -7,10 +7,6 @@ on:
     types:
       - completed
 
-permissions:
-  contents: read
-  actions: read
-
 env:
   AWS_REGION: us-east-1
 

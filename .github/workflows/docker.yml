@@ -1,4 +1,4 @@
-name: Build Push Deploy ECS
+name: AI Agent Build Push Deploy
 
 on:
   workflow_run:
@@ -7,8 +7,6 @@ on:
     types:
       - completed
 
-permissions:
-  contents: read
 
 env:
   AWS_REGION: us-east-1
@@ -21,6 +19,12 @@ env:
   FRONTEND_ECS_SERVICE: ai-agent-frontend
   BACKEND_ECS_SERVICE: ai-agent-backend
 
+  FRONTEND_TASK_DEFINITION: ai-agent-frontend
+  BACKEND_TASK_DEFINITION: ai-agent-backend
+
+  FRONTEND_CONTAINER_NAME: frontend
+  BACKEND_CONTAINER_NAME: backend
+
 jobs:
   deploy:
     name: Build Push Deploy
@@ -30,129 +34,201 @@ jobs:
 
     steps:
 
-      # -----------------------------------
+      # ==========================================
       # Checkout
-      # -----------------------------------
+      # ==========================================
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      # -----------------------------------
-      # Check project structure
-      # -----------------------------------
-      - name: Check Project Files
-        run: |
-          echo "Project root:"
-          pwd
+     
 
-          echo ""
-          echo "Root files:"
-          ls -la
-
-          echo ""
-          echo "Frontend:"
-          ls -la frontend
-
-      # -----------------------------------
-      # Configure AWS
-      # -----------------------------------
-      - name: Configure AWS credentials
+      # ==========================================
+      # AWS Credentials
+      # ==========================================
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # -----------------------------------
+      # ==========================================
       # Login ECR
-      # -----------------------------------
+      # ==========================================
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # -----------------------------------
-      # Build Frontend
-      # -----------------------------------
+      # ==========================================
+      # Build Frontend Image
+      # ==========================================
       - name: Build Frontend Docker Image
+        id: build-frontend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
+          IMAGE_SHA="$ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:$GITHUB_SHA"
+          IMAGE_LATEST="$ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:latest"
+
+          echo "Building frontend image:"
+          echo "$IMAGE_SHA"
+          echo "$IMAGE_LATEST"
+
           docker build \
-            -t ${{ steps.login-ecr.outputs.registry }}/${{ env.FRONTEND_ECR_REPOSITORY }}:latest \
+            -t "$IMAGE_SHA" \
+            -t "$IMAGE_LATEST" \
             ./frontend
 
-      # -----------------------------------
-      # Build Backend
-      # Backend is in project root
-      # -----------------------------------
+          echo "image=$IMAGE_SHA" >> "$GITHUB_OUTPUT"
+
+      # ==========================================
+      # Build Backend Image
+      # Backend Dockerfile is in project root
+      # ==========================================
       - name: Build Backend Docker Image
+        id: build-backend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
+          IMAGE_SHA="$ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:$GITHUB_SHA"
+          IMAGE_LATEST="$ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:latest"
+
+          echo "Building backend image:"
+          echo "$IMAGE_SHA"
+          echo "$IMAGE_LATEST"
+
           docker build \
-            -t ${{ steps.login-ecr.outputs.registry }}/${{ env.BACKEND_ECR_REPOSITORY }}:latest \
+            -t "$IMAGE_SHA" \
+            -t "$IMAGE_LATEST" \
             .
 
-      # -----------------------------------
-      # Push Frontend
-      # -----------------------------------
-      - name: Push Frontend Image
-        run: |
-          docker push \
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.FRONTEND_ECR_REPOSITORY }}:latest
+          echo "image=$IMAGE_SHA" >> "$GITHUB_OUTPUT"
 
-      # -----------------------------------
-      # Push Backend
-      # -----------------------------------
-      - name: Push Backend Image
+      # ==========================================
+      # Push Frontend Images
+      # ==========================================
+      - name: Push Frontend Images
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker push \
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.BACKEND_ECR_REPOSITORY }}:latest
+          IMAGE_SHA="$ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:$GITHUB_SHA"
+          IMAGE_LATEST="$ECR_REGISTRY/$FRONTEND_ECR_REPOSITORY:latest"
 
-      # -----------------------------------
-      # Update Frontend ECS
-      # -----------------------------------
+          echo "Pushing frontend SHA image:"
+          docker push "$IMAGE_SHA"
+
+          echo "Pushing frontend latest image:"
+          docker push "$IMAGE_LATEST"
+
+      # ==========================================
+      # Push Backend Images
+      # ==========================================
+      - name: Push Backend Images
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          IMAGE_SHA="$ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:$GITHUB_SHA"
+          IMAGE_LATEST="$ECR_REGISTRY/$BACKEND_ECR_REPOSITORY:latest"
+
+          echo "Pushing backend SHA image:"
+          docker push "$IMAGE_SHA"
+
+          echo "Pushing backend latest image:"
+          docker push "$IMAGE_LATEST"
+
+      # ==========================================
+      # Get Current Frontend Task Definition
+      # ==========================================
+      - name: Get Current Frontend Task Definition
+        id: current-frontend-task
+        run: |
+          REVISION=$(aws ecs describe-task-definition \
+            --task-definition "$FRONTEND_TASK_DEFINITION" \
+            --query 'taskDefinition.revision' \
+            --output text)
+
+          echo "Frontend current revision: $REVISION"
+
+          echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
+
+      # ==========================================
+      # Get Current Backend Task Definition
+      # ==========================================
+      - name: Get Current Backend Task Definition
+        id: current-backend-task
+        run: |
+          REVISION=$(aws ecs describe-task-definition \
+            --task-definition "$BACKEND_TASK_DEFINITION" \
+            --query 'taskDefinition.revision' \
+            --output text)
+
+          echo "Backend current revision: $REVISION"
+
+          echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
+
+      # ==========================================
+      # Render Frontend Task Definition
+      # Only image is changed
+      # ==========================================
+      - name: Render Frontend Task Definition
+        id: render-frontend-task-definition
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition-family: ${{ env.FRONTEND_TASK_DEFINITION }}
+          task-definition-revision: ${{ steps.current-frontend-task.outputs.revision }}
+          container-name: ${{ env.FRONTEND_CONTAINER_NAME }}
+          image: ${{ steps.build-frontend.outputs.image }}
+
+      # ==========================================
+      # Deploy Frontend ECS
+      # ==========================================
       - name: Deploy Frontend ECS
-        run: |
-          aws ecs update-service \
-            --cluster "$ECS_CLUSTER" \
-            --service "$FRONTEND_ECS_SERVICE" \
-            --force-new-deployment
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-frontend-task-definition.outputs.task-definition }}
+          service: ${{ env.FRONTEND_ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
 
-      # -----------------------------------
-      # Update Backend ECS
-      # -----------------------------------
+      # ==========================================
+      # Render Backend Task Definition
+      # Only image is changed
+      # ==========================================
+      - name: Render Backend Task Definition
+        id: render-backend-task-definition
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition-family: ${{ env.BACKEND_TASK_DEFINITION }}
+          task-definition-revision: ${{ steps.current-backend-task.outputs.revision }}
+          container-name: ${{ env.BACKEND_CONTAINER_NAME }}
+          image: ${{ steps.build-backend.outputs.image }}
+
+      # ==========================================
+      # Deploy Backend ECS
+      # ==========================================
       - name: Deploy Backend ECS
-        run: |
-          aws ecs update-service \
-            --cluster "$ECS_CLUSTER" \
-            --service "$BACKEND_ECS_SERVICE" \
-            --force-new-deployment
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-backend-task-definition.outputs.task-definition }}
+          service: ${{ env.BACKEND_ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
 
-      # -----------------------------------
-      # Wait Frontend
-      # -----------------------------------
-      - name: Wait for Frontend ECS
-        run: |
-          aws ecs wait services-stable \
-            --cluster "$ECS_CLUSTER" \
-            --services "$FRONTEND_ECS_SERVICE"
-
-      # -----------------------------------
-      # Wait Backend
-      # -----------------------------------
-      - name: Wait for Backend ECS
-        run: |
-          aws ecs wait services-stable \
-            --cluster "$ECS_CLUSTER" \
-            --services "$BACKEND_ECS_SERVICE"
-
-      # -----------------------------------
-      # Complete
-      # -----------------------------------
+      # ==========================================
+      # Deployment Complete
+      # ==========================================
       - name: Deployment Complete
         run: |
-          echo "======================================"
-          echo "Deployment completed successfully"
-          echo "======================================"
-          echo "Frontend image pushed"
-          echo "Backend image pushed"
-          echo "Frontend ECS updated"
-          echo "Backend ECS updated"
+          echo "=========================================="
+          echo "AI Agent Deployment Successful"
+          echo "=========================================="
+          echo "Frontend:"
+          echo "  ECR: $FRONTEND_ECR_REPOSITORY"
+          echo "  ECS: $FRONTEND_ECS_SERVICE"
+          echo ""
+          echo "Backend:"
+          echo "  ECR: $BACKEND_ECR_REPOSITORY"
+          echo "  ECS: $BACKEND_ECS_SERVICE"
+          echo "=========================================="
