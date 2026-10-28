@@ -1,11 +1,14 @@
 
-name: Build and Deploy Next.js to Azure Web App
+name: Build and deploy Node.js to Azure Function App
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+
+env:
+  NODE_VERSION: "22.x"
 
 jobs:
   build:
@@ -21,37 +24,46 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.x"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
-      - name: Install frontend dependencies
-        working-directory: sample/frontend
-        run: npm install
-
-      - name: Build frontend
-        working-directory: sample/frontend
-        run: npm run build
-
-      - name: Install backend dependencies
-        working-directory: sample/backend
-        run: npm install
-
-      - name: Prepare deployment
+      - name: Verify project files
         run: |
-          mkdir -p sample/backend/frontend
-          cp -a sample/frontend/.next sample/backend/frontend/
-          cp sample/frontend/package.json sample/backend/frontend/
-          if [ -d sample/frontend/public ]; then
-            cp -a sample/frontend/public sample/backend/frontend/public
-          fi
-          test -f sample/backend/server.js
-          test -f sample/backend/package.json
-          test -f sample/backend/frontend/.next/BUILD_ID
+          test -f package.json || {
+            echo "ERROR: package.json is missing"
+            exit 1
+          }
 
-      - name: Upload artifact
+          test -f host.json || {
+            echo "ERROR: host.json is missing"
+            exit 1
+          }
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Build application
+        run: npm run build --if-present
+
+      - name: Run tests
+        run: npm run test --if-present
+
+      - name: Upload deployment package
         uses: actions/upload-artifact@v4
         with:
-          name: node-app
-          path: sample/backend/
+          name: function-app
+          path: |
+            .
+            !node_modules/**
+            !.git/**
+            !.github/**
+          include-hidden-files: true
+          if-no-files-found: error
 
   deploy:
     runs-on: ubuntu-latest
@@ -62,22 +74,21 @@ jobs:
       id-token: write
 
     steps:
-      - name: Download artifact
+      - name: Download deployment package
         uses: actions/download-artifact@v4
         with:
-          name: node-app
+          name: function-app
           path: deploy
 
-      - name: Azure login
+      - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_7E100DFDCC1E4B619BE26BD880710D14 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_3C5E1EF2E7924ACB89F50405198BCCA8 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_96D16614EF04479CA51EE98A7483D0FF }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_7D13BB9D047F4FAA801D1CC8E8A37757 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_A018C8F5A6494C4E9594862685464273 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_E6BB268F9C4C4B288792BF67E045B6D8 }}
 
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
+      - name: Deploy Azure Function App
+        uses: Azure/functions-action@v1
         with:
-          app-name: sample-apps
-          slot-name: Production
+          app-name: my-function
           package: deploy
