@@ -1,61 +1,79 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/azure/functions-action
-# More GitHub Actions for Azure: https://github.com/Azure/actions
 
-name: Build and deploy Node.js project to Azure Function App - my-function
+name: Build and deploy Node.js to Azure Function App
 
 on:
   push:
     branches:
-      - 'main'
+      - main
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.' # set this to the path to your web app project, defaults to the repository root
-  NODE_VERSION: '22.x' # set this to the node version to use (supports 8.x, 10.x, 12.x)
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: "."
+  NODE_VERSION: "22.x"
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
+
     permissions:
-      contents: read #This is required for actions/checkout
-      
+      contents: read
+      id-token: write
+
     steps:
-      - name: 'Checkout GitHub Action'
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node ${{ env.NODE_VERSION }} Environment
-        uses: actions/setup-node@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: 'Resolve Project Dependencies Using Npm'
-        shell: pwsh
+      - name: Verify project files
         run: |
-          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          npm install
-          npm run build --if-present
-          npm run test --if-present
-          popd
+          test -f package.json || {
+            echo "ERROR: package.json is missing"
+            exit 1
+          }
+          test -f host.json || {
+            echo "ERROR: host.json is missing; this is not an Azure Functions project root"
+            exit 1
+          }
 
-      - name: Upload artifact for deployment job
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build application
+        run: npm run build --if-present
+
+      - name: Run tests
+        run: npm run test --if-present
+
+      - name: Upload deployment package
         uses: actions/upload-artifact@v4
         with:
-          name: node-app
-          path: .
+          name: function-app
+          path: |
+            .
+            !node_modules/**
+            !.git/**
+            !.github/**
+          include-hidden-files: true
 
   deploy:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     needs: build
+
     permissions:
-      id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
+      contents: read
+      id-token: write
 
     steps:
-      - name: Download artifact from build job
+      - name: Download deployment package
         uses: actions/download-artifact@v4
         with:
-          name: node-app
-      
+          name: function-app
+          path: deploy
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -63,11 +81,8 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_A018C8F5A6494C4E9594862685464273 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_E6BB268F9C4C4B288792BF67E045B6D8 }}
 
-      - name: 'Run Azure Functions Action'
+      - name: Deploy Azure Function App
         uses: Azure/functions-action@v1
-        id: fa
         with:
-          app-name: 'my-function'
-          slot-name: 'Production'
-          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-          
+          app-name: my-function
+          package: deploy
